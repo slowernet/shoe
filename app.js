@@ -524,6 +524,10 @@ class KanbanApp {
         const itemEl = document.createElement('div')
         itemEl.className = 'option-item'
         
+        const dragHandle = document.createElement('div')
+        dragHandle.className = 'option-drag-handle'
+        dragHandle.textContent = '⋮⋮'
+        
         const input = document.createElement('input')
         input.type = 'text'
         input.value = value
@@ -573,6 +577,7 @@ class KanbanApp {
         colorContainer.appendChild(colorButton)
         colorContainer.appendChild(colorPalette)
         
+        itemEl.appendChild(dragHandle)
         itemEl.appendChild(input)
         itemEl.appendChild(colorContainer)
         itemEl.appendChild(deleteBtn)
@@ -864,6 +869,19 @@ class KanbanApp {
             )
             optionsList.appendChild(itemEl)
         })
+
+        // Make options list sortable
+        if (optionsList && typeof Sortable !== 'undefined') {
+            Sortable.create(optionsList, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                onEnd: (evt) => {
+                    // Reorder the options array
+                    const movedItem = options.splice(evt.oldIndex, 1)[0]
+                    options.splice(evt.newIndex, 0, movedItem)
+                }
+            })
+        }
     }
 
     // ===== Settings Panel =====
@@ -1261,6 +1279,7 @@ class KanbanApp {
             try {
                 const data = JSON.parse(event.target.result)
                 this.validateImportData(data)
+                this.normalizeImportedData(data)
                 
                 this.schema = data.schema
                 this.records = data.records
@@ -1433,6 +1452,41 @@ class KanbanApp {
             throw new Error('Invalid JSON format: missing schema or records')
         }
         return true
+    }
+
+    normalizeImportedData(data) {
+        // For each select/multi-select property, collect all values used in records
+        // and add any missing ones to the property's options array
+        data.schema.forEach(property => {
+            if (!this.isSelectType(property.type)) return
+            
+            const existingOptions = property.options || []
+            const existingSet = new Set(existingOptions)
+            const newValues = []
+            
+            // Collect values from records that aren't already in options
+            data.records.forEach(record => {
+                const value = record.values[property.id]
+                if (value === null || value === undefined) return
+                
+                if (Array.isArray(value)) {
+                    value.forEach(v => {
+                        if (!existingSet.has(v) && !newValues.includes(v)) {
+                            newValues.push(v)
+                        }
+                    })
+                } else {
+                    if (!existingSet.has(value) && !newValues.includes(value)) {
+                        newValues.push(value)
+                    }
+                }
+            })
+            
+            // Preserve original order, append new values at the end
+            property.options = [...existingOptions, ...newValues]
+        })
+        
+        return data
     }
 
     closeModal(modal) {

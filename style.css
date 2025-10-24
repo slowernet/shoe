@@ -884,7 +884,7 @@ body.drag-active::before {
 .modal-body {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 32px 24px 32px;
+    padding: 24px 24px 24px 24px;
 }
 
 /* Card Description */
@@ -1166,10 +1166,27 @@ body.drag-active::before {
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
     transition: all var(--transition-normal);
+    cursor: grab;
 }
 
 .option-item:hover {
     border-color: var(--color-text-tertiary);
+}
+
+.option-item:active {
+    cursor: grabbing;
+}
+
+.option-drag-handle {
+    color: var(--color-text-tertiary);
+    font-size: 14px;
+    line-height: 1;
+    user-select: none;
+    cursor: grab;
+}
+
+.option-item:active .option-drag-handle {
+    cursor: grabbing;
 }
 
 .option-item input[type="text"] {
