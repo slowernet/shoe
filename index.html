@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Kanban Board</title>
+		<link rel="stylesheet" href="style.css" />
+		<script>
+			const qs = (s, o = document) => o.querySelector(s)
+			const qsa = (s, o = document) => o.querySelectorAll(s)
+			const ready = (f) => document.addEventListener("DOMContentLoaded", f)
+			const el = (tag, props = {}, ...children) => {
+				const element = document.createElement(tag)
+				Object.entries(props).forEach(([key, value]) => {
+					if (key === 'class') element.className = value
+					else if (key === 'text') element.textContent = value
+					else if (key === 'html') element.innerHTML = value
+					else if (key.startsWith('on')) element[key] = value
+					else element[key] = value
+				})
+				children.forEach(child => {
+					if (child) element.appendChild(typeof child === 'string' ? document.createTextNode(child) : child)
+				})
+				return element
+			}
+		</script>
+		<script defer src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+		<script defer src="https://cdn.jsdelivr.net/npm/micromodal/dist/micromodal.min.js"></script>
+	</head>
+	<body>
+		<div id="app">
+			<!-- Top Toolbar -->
+			<header class="toolbar">
+				<div class="toolbar-left">
+				</div>
+				<div class="toolbar-right">
+					<select id="groupBySelect" class="group-by-select">
+						<option value="">Select a field to group by...</option>
+					</select>
+					<button id="newCardBtn" class="btn btn-primary">
+						+ New
+					</button>
+					<div class="dropdown">
+						<button class="btn">⋯</button>
+						<div class="dropdown-menu">
+							<button id="settingsBtn" class="dropdown-item">
+								Property visibility...
+							</button>
+							<div class="dropdown-divider"></div>
+							<button id="exportBtn" class="dropdown-item">
+								Export to JSON
+							</button>
+							<button id="importBtn" class="dropdown-item">
+								Import from JSON
+							</button>
+							<div class="dropdown-divider"></div>
+							<button id="deleteAllCardsBtn" class="dropdown-item dropdown-item-danger">
+								Delete all cards...
+							</button>
+							<button id="deleteDatabaseBtn" class="dropdown-item dropdown-item-danger">
+								Delete database...
+							</button>
+							<div class="dropdown-divider"></div>
+							<button id="themeToggleBtn" class="dropdown-item">
+								Toggle Dark Mode
+							</button>
+						</div>
+					</div>
+				</div>
+			</header>
+
+			<!-- Main Board Area -->
+			<main id="boardContainer" class="board-container">
+				<!-- Columns will be rendered here -->
+			</main>
+
+			<!-- Settings Panel -->
+			<div id="settingsPanel" class="settings-panel hidden">
+				<div class="settings-header">
+					<h2>Visible properties</h2>
+					<button id="closeSettingsBtn" class="close-btn">
+						&times;
+					</button>
+				</div>
+				<div class="settings-content">
+					<div class="settings-section">
+						<div class="settings-section-header">
+							<h3>Shown in board</h3>
+							<button id="hideAllBtn" class="link-btn-small">
+								Hide all
+							</button>
+						</div>
+						<div
+							id="visiblePropertiesList"
+							class="properties-list"
+						></div>
+					</div>
+					<div class="settings-section">
+						<div class="settings-section-header">
+							<h3>Hidden in board</h3>
+							<button id="showAllBtn" class="link-btn-small">
+								Show all
+							</button>
+						</div>
+						<div
+							id="hiddenPropertiesList"
+							class="properties-list"
+						></div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Card Detail Modal -->
+			<div id="cardModal" class="modal hidden">
+				<div class="modal-overlay"></div>
+				<div class="modal-content">
+					<div class="modal-header">
+						<input
+							type="text"
+							id="cardTitle"
+							class="card-title-input"
+							placeholder="Untitled"
+						/>
+						<div class="modal-header-actions">
+							<span id="savedIndicator" class="saved-indicator hidden">Saved</span>
+							<button id="deleteCardBtn" class="btn-icon" title="Delete card">
+								🗑
+							</button>
+							<button id="closeModalBtn" class="close-btn">
+								&times;
+							</button>
+						</div>
+					</div>
+					<div class="modal-body">
+						<div
+							id="cardPropertiesContainer"
+							class="card-properties"
+						>
+							<!-- Properties will be rendered here -->
+						</div>
+						<div class="card-properties-actions">
+							<button id="addPropertyBtn" class="btn">
+								+ Add a property
+							</button>
+						</div>
+						<div class="card-description-section">
+							<label class="card-description-label">Description</label>
+							<textarea
+								id="cardDescription"
+								class="card-description-input"
+								placeholder="Add a description..."
+								rows="4"
+							></textarea>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Property Editor Modal (for Select/Multi-select configuration) -->
+			<div id="propertyEditorModal" class="modal hidden">
+				<div class="modal-overlay"></div>
+				<div class="modal-content modal-content-sm">
+					<div class="modal-header">
+						<h2 id="propertyEditorTitle">Edit Property</h2>
+						<button id="closePropertyEditorBtn" class="close-btn">
+							&times;
+						</button>
+					</div>
+					<div class="modal-body">
+						<div class="form-group">
+							<label>Property Name</label>
+							<input
+								type="text"
+								id="propertyNameInput"
+								placeholder="Property name"
+							/>
+						</div>
+						<div class="form-group">
+							<label>Type</label>
+							<select id="propertyTypeSelect">
+								<option value="text">Text</option>
+								<option value="number">Number</option>
+								<option value="select">Select</option>
+								<option value="multi-select">
+									Multi-select
+								</option>
+								<option value="date">Date</option>
+								<option value="checkbox">Checkbox</option>
+							</select>
+						</div>
+						<div id="optionsContainer" class="form-group hidden">
+							<label>Options</label>
+							<div id="optionsList" class="options-list"></div>
+							<button id="addOptionBtn" class="btn btn-small btn-secondary">
+								+ Add option
+							</button>
+						</div>
+						<div class="property-actions">
+							<button id="duplicatePropertyBtn" class="btn btn-secondary">
+								📋 Duplicate
+							</button>
+							<button
+								id="deletePropertyBtn"
+								class="btn btn-danger"
+							>
+								🗑 Delete
+							</button>
+						</div>
+						<div class="form-actions">
+							<button
+								id="savePropertyBtn"
+								class="btn btn-primary"
+							>
+								Save
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Property Name Input Modal -->
+			<div id="propertyNameModal" class="modal micromodal-slide" aria-hidden="true">
+				<div class="modal-overlay" data-micromodal-close></div>
+				<div class="modal-content modal-content-sm">
+					<div class="modal-header">
+						<h2>New Property</h2>
+						<button class="close-btn" data-micromodal-close aria-label="Close modal">
+							&times;
+						</button>
+					</div>
+					<div class="modal-body">
+						<div class="form-group">
+							<label>Property Name</label>
+							<input
+								type="text"
+								id="newPropertyNameInput"
+								placeholder="Enter property name..."
+								class="property-field-input"
+							/>
+						</div>
+						<div class="form-group">
+							<label>Type</label>
+							<select id="newPropertyTypeSelect" class="property-field-input">
+								<option value="text">Text</option>
+								<option value="number">Number</option>
+								<option value="select">Select</option>
+								<option value="multi-select">Multi-select</option>
+								<option value="date">Date</option>
+								<option value="checkbox">Checkbox</option>
+							</select>
+						</div>
+					</div>
+					<div class="form-actions">
+						<button id="cancelPropertyNameBtn" class="btn" data-micromodal-close>
+							Cancel
+						</button>
+						<button id="confirmPropertyNameBtn" class="btn btn-primary">
+							Create
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Hidden file input for import -->
+			<input type="file" id="fileInput" class="hidden" accept=".json" />
+		</div>
+
+		<script defer src="app.js"></script>
+	</body>
+</html>
